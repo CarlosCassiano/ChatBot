@@ -1,4 +1,5 @@
 from chatterbot import ChatBot
+from chatterbot.preprocessors import clean_whitespace
 
 def get_chatbot():
     chatbot = ChatBot(
@@ -9,11 +10,12 @@ def get_chatbot():
             {
                 'import_path': 'chatterbot.logic.BestMatch',
                 'default_response': 'Desculpe, não entendi.',
-                'maximum_similarity_threshold': 0.90  # Ajustar o threshold para um valor mais permissivo
+                'maximum_similarity_threshold': 0.80  # Ajustar o threshold para um valor mais permissivo
             }
         ],
         preprocessors=[
-            'chatterbot.preprocessors.clean_whitespace'
+            'chatterbot.preprocessors.clean_whitespace',
+            # Adicione preprocessadores de NLP conforme necessário
         ],
         read_only=True  # Desativar a aprendizagem em tempo real
     )

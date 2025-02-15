@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adicionar Perguntas e Respostas</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Adicionar Perguntas e Respostas</h1>
+        <form id="qna-form">
+            <div class="form-group">
+                <label for="question">Pergunta:</label>
+                <input type="text" id="question" name="question" required>
+            </div>
+            <div class="form-group">
+                <label for="answer">Resposta:</label>
+                <textarea id="answer" name="answer" rows="5" required></textarea> <!-- Alterado para textarea -->
+            </div>
+            <button type="submit">Adicionar</button>
+        </form>
+        <br>
+        <button onclick="location.href='/'">Voltar para o Chatbot</button> <!-- Botão para voltar à página principal -->
+        <div id="response-message"></div>
+    </div>
+
+    <script>
+        document.getElementById("qna-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            var question = document.getElementById("question").value;
+            var answer = document.getElementById("answer").value;
+
+            fetch(`/add_qna`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ question: question, answer: answer })
+            })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("response-message").textContent = data;
+                document.getElementById("qna-form").reset();
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
