@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chatbot da Empresa</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
@@ -15,7 +16,10 @@
         <input type="text" id="user-input" placeholder="Digite sua mensagem aqui...">
         <button onclick="sendMessage()">Enviar</button>
         <br>
+        {% if role == 'admin' %}
         <button onclick="location.href='/add'">Adicionar Perguntas e Respostas</button>
+        <button onclick="location.href='/manage'">Gerenciar Perguntas e Respostas</button>
+        {% endif %}
     </div>
 
     <script>
@@ -33,7 +37,7 @@
                 .then(data => {
                     var botMessage = document.createElement("div");
                     botMessage.className = "bot-message";
-                    botMessage.innerHTML = data;  // Usar innerHTML para renderizar o conteúdo HTML
+                    botMessage.innerHTML = data;
                     chatBox.appendChild(botMessage);
                     chatBox.scrollTop = chatBox.scrollHeight;
                 });

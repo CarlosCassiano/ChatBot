@@ -1,6 +1,15 @@
 import sys
 import os
-from flask import Flask, render_template, request
+import json
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from sqlalchemy import or_
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, MetaData, Table
+import sqlite3
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Adicionar o diretório 'chatbot' ao sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -9,32 +18,174 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from config import get_chatbot
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Chave secreta para sessões
 chatbot = get_chatbot()
 
+# Configurar o mecanismo de banco de dados para o SQLAlchemy
+engine = create_engine('sqlite:///c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
+Session = sessionmaker(bind=engine)
+
+def get_user(username):
+    conn = sqlite3.connect('c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
+    cursor = conn.cursor()
+    cursor.execute('SELECT username, password, role FROM users WHERE username = ?', (username,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+def create_user(username, password, role):
+    conn = sqlite3.connect('c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, password, role))
+    conn.commit()
+    conn.close()
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        data = request.get_json()
+        username = data['username']
+        password = data['password']
+
+        user = get_user(username)
+        if user and user[1] == password:
+            session['username'] = username
+            session['role'] = user[2]
+            return jsonify({'success': True, 'redirect': url_for('index')})
+        else:
+            return jsonify({'success': False, 'message': 'Usuário ou senha inválidos.'})
+
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.pop('username', None)
+    session.pop('role', None)
+    return redirect(url_for('login'))
+
 @app.route("/")
-def home():
-    return render_template("index.html")
+def index():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template("index.html", role=session.get('role'))
 
 @app.route("/add")
 def add():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
     return render_template("add_qna.html")
+
+@app.route("/manage")
+def manage():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+    return render_template("manage_qna.html")
 
 @app.route("/add_qna", methods=["POST"])
 def add_qna():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
     data = request.get_json()
     question = data['question']
     answer = data['answer']
     
-    chatbot.storage.create(text=question, in_response_to=None)
     chatbot.storage.create(text=answer, in_response_to=question)
     
     return "Pergunta e Resposta adicionadas com sucesso!"
 
+@app.route("/search_qna")
+def search_qna():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
+    query = request.args.get('query')
+    logging.debug(f"Query received: {query}")
+    
+    session = Session()
+    
+    # Usar meta dados para acessar a tabela diretamente
+    metadata = MetaData()
+    statements = Table('statement', metadata, autoload_with=engine)
+    
+    results = session.query(statements).filter(
+        or_(statements.c.text.like(f"%{query}%"), statements.c.in_response_to.like(f"%{query}%"))
+    ).all()
+    
+    logging.debug(f"Results found: {results}")
+    
+    session.close()
+    
+    qna_list = []
+    for result in results:
+        logging.debug(f"Processing result: {result}")
+        if result[4] is not None:  # Acessar o campo in_response_to corretamente
+            qna_list.append({
+                'id': result[7],  # Acessar o campo id corretamente
+                'question': result[4],  # Acessar o campo in_response_to corretamente
+                'answer': result[0]  # Acessar o campo text corretamente
+            })
+    
+    logging.debug(f"Final QnA list: {qna_list}")
+    return jsonify(qna_list)
+
+@app.route("/edit_qna", methods=["POST"])
+def edit_qna():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
+    data = request.get_json()
+    id = data['id']
+    new_question = data['question']
+    new_answer = data['answer']
+    
+    session = Session()
+    
+    # Usar meta dados para acessar a tabela diretamente
+    metadata = MetaData()
+    statements = Table('statement', metadata, autoload_with=engine)
+    
+    # Atualizar a entrada no banco de dados
+    stmt = statements.update().where(statements.c.id == id).values(
+        text=new_answer,
+        in_response_to=new_question
+    )
+    session.execute(stmt)
+    session.commit()
+    session.close()
+    
+    return "Pergunta e Resposta editadas com sucesso!"
+
+@app.route("/delete_qna", methods=["POST"])
+def delete_qna():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
+    data = request.get_json()
+    id = data['id']
+    
+    session = Session()
+    
+    # Usar meta dados para acessar a tabela diretamente
+    metadata = MetaData()
+    statements = Table('statement', metadata, autoload_with=engine)
+    
+    # Deletar a entrada do banco de dados
+    stmt = statements.delete().where(statements.c.id == id)
+    session.execute(stmt)
+    session.commit()
+    session.close()
+    
+    return "Pergunta e Resposta excluídas com sucesso!"
+
 @app.route("/get")
 def get_bot_response():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
     userText = request.args.get('msg')
     resposta = chatbot.get_response(userText)
-    return f"<pre>{str(resposta)}</pre>"  # Usar a tag <pre> para preservar a formatação
+    return f"<pre>{str(resposta)}</pre>"
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

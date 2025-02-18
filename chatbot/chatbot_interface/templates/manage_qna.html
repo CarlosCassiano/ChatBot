@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Perguntas e Respostas</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Gerenciar Perguntas e Respostas</h1>
+        <input type="text" id="search-input" placeholder="Pesquisar perguntas...">
+        <button onclick="searchQnA()">Pesquisar</button>
+        <div id="qna-list"></div>
+        <br>
+        <button onclick="location.href='/'">Voltar para o Chatbot</button>
+    </div>
+
+    <script>
+        function searchQnA() {
+            var searchInput = document.getElementById("search-input").value;
+            fetch(`/search_qna?query=${searchInput}`)
+                .then(response => response.json())
+                .then(data => {
+                    var qnaList = document.getElementById("qna-list");
+                    qnaList.innerHTML = "";
+                    data.forEach(item => {
+                        var qnaItem = document.createElement("div");
+                        qnaItem.innerHTML = `
+                            <div>
+                                <strong>Pergunta:</strong> ${item.question} <br>
+                                <strong>Resposta:</strong> ${item.answer} <br>
+                                <button onclick="editQnA(${item.id})">Editar</button>
+                                <button onclick="deleteQnA(${item.id})">Excluir</button>
+                            </div>
+                            <hr>
+                        `;
+                        qnaList.appendChild(qnaItem);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function editQnA(id) {
+            var newQuestion = prompt("Editar Pergunta:");
+            var newAnswer = prompt("Editar Resposta:");
+            if (newQuestion && newAnswer) {
+                fetch(`/edit_qna`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id: id, question: newQuestion, answer: newAnswer })
+                })
+                .then(response => response.text())
+                .then(data => {
+                    alert(data);
+                    searchQnA();
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function deleteQnA(id) {
+            fetch(`/delete_qna`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: id })
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                searchQnA();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
