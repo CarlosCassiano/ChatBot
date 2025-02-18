@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Usuários</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Gerenciar Usuários</h1>
+        <div>
+            <input type="text" id="search-input" placeholder="Pesquisar usuários...">
+            <button onclick="searchUsers()">Pesquisar</button>
+        </div>
+        <div id="user-list"></div>
+        <br>
+        <form id="add-user-form">
+            <div class="form-group">
+                <label for="username">Usuário:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label for="role">Permissão:</label>
+                <select id="role" name="role" required>
+                    <option value="user">Usuário</option>
+                    <option value="admin">Administrador</option>
+                </select>
+            </div>
+            <button type="submit">Adicionar Usuário</button>
+        </form>
+        <br>
+        <button onclick="location.href='/'">Voltar para o Chatbot</button>
+    </div>
+
+    <script>
+        function searchUsers() {
+            var searchInput = document.getElementById("search-input").value;
+            fetch(`/search_users?query=${searchInput}`)
+                .then(response => response.json())
+                .then(data => {
+                    var userList = document.getElementById("user-list");
+                    userList.innerHTML = "";
+                    data.forEach(user => {
+                        var userItem = document.createElement("div");
+                        userItem.innerHTML = `
+                            <div>
+                                <strong>Usuário:</strong> ${user.username} <br>
+                                <strong>Permissão:</strong> ${user.role} <br>
+                                <button onclick="editUser(${user.id})">Editar</button>
+                                <button onclick="deleteUser(${user.id})">Excluir</button>
+                            </div>
+                            <hr>
+                        `;
+                        userList.appendChild(userItem);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function editUser(id) {
+            var newRole = prompt("Editar Permissão (user/admin):");
+            if (newRole) {
+                fetch(`/edit_user`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id: id, role: newRole })
+                })
+                .then(response => response.text())
+                .then(data => {
+                    alert(data);
+                    searchUsers();
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function deleteUser(id) {
+            fetch(`/delete_user`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: id })
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                searchUsers();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        document.getElementById("add-user-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            var username = document.getElementById("username").value;
+            var password = document.getElementById("password").value;
+            var role = document.getElementById("role").value;
+
+            fetch(`/add_user`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: username, password: password, role: role })
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                document.getElementById("add-user-form").reset();
+                searchUsers();
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>

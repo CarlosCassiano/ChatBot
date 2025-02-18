@@ -28,15 +28,37 @@ Session = sessionmaker(bind=engine)
 def get_user(username):
     conn = sqlite3.connect('c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
     cursor = conn.cursor()
-    cursor.execute('SELECT username, password, role FROM users WHERE username = ?', (username,))
+    cursor.execute('SELECT id, username, password, role FROM users WHERE username = ?', (username,))
     user = cursor.fetchone()
     conn.close()
     return user
+
+def get_users_by_query(query):
+    conn = sqlite3.connect('c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, username, role FROM users WHERE username LIKE ?', (f'%{query}%',))
+    users = cursor.fetchall()
+    conn.close()
+    return users
 
 def create_user(username, password, role):
     conn = sqlite3.connect('c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
     cursor = conn.cursor()
     cursor.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', (username, password, role))
+    conn.commit()
+    conn.close()
+
+def update_user_role(user_id, new_role):
+    conn = sqlite3.connect('c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
+    cursor = conn.cursor()
+    cursor.execute('UPDATE users SET role = ? WHERE id = ?', (new_role, user_id))
+    conn.commit()
+    conn.close()
+
+def delete_user(user_id):
+    conn = sqlite3.connect('c:/Users/user/Desktop/IA/chatbot/database/user.sqlite')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
     conn.commit()
     conn.close()
 
@@ -48,9 +70,9 @@ def login():
         password = data['password']
 
         user = get_user(username)
-        if user and user[1] == password:
+        if user and user[2] == password:
             session['username'] = username
-            session['role'] = user[2]
+            session['role'] = user[3]
             return jsonify({'success': True, 'redirect': url_for('index')})
         else:
             return jsonify({'success': False, 'message': 'Usuário ou senha inválidos.'})
@@ -80,6 +102,12 @@ def manage():
     if 'username' not in session or session.get('role') != 'admin':
         return redirect(url_for('index'))
     return render_template("manage_qna.html")
+
+@app.route("/manage_users")
+def manage_users():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+    return render_template("manage_users.html")
 
 @app.route("/add_qna", methods=["POST"])
 def add_qna():
@@ -177,6 +205,67 @@ def delete_qna():
     session.close()
     
     return "Pergunta e Resposta excluídas com sucesso!"
+
+@app.route("/add_user", methods=["POST"])
+def add_user():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
+    role = data['role']
+    
+    create_user(username, password, role)
+    
+    return "Usuário adicionado com sucesso!"
+
+@app.route("/search_users")
+def search_users():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
+    query = request.args.get('query')
+    logging.debug(f"Query received: {query}")
+    
+    users = get_users_by_query(query)
+    logging.debug(f"Results found: {users}")
+    
+    user_list = []
+    for user in users:
+        user_list.append({
+            'id': user[0],
+            'username': user[1],
+            'role': user[2]
+        })
+    
+    logging.debug(f"Final user list: {user_list}")
+    return jsonify(user_list)
+
+@app.route("/edit_user", methods=["POST"])
+def edit_user():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
+    data = request.get_json()
+    id = data['id']
+    new_role = data['role']
+    
+    update_user_role(id, new_role)
+    
+    return "Permissão do usuário editada com sucesso!"
+
+@app.route("/delete_user", methods=["POST"])
+def delete_user():
+    if 'username' not in session or session.get('role') != 'admin':
+        return redirect(url_for('index'))
+
+    data = request.get_json()
+    id = data['id']
+    
+    delete_user(id)
+    
+    return "Usuário excluído com sucesso!"
 
 @app.route("/get")
 def get_bot_response():
